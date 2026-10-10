@@ -1,0 +1,256 @@
+/* ==========================================================================
+   HariOm Sales And Service — Scrolling Story
+   Same workshop navy + marigold identity as the tab version, now applied
+   to full-screen, swipe/scroll-snap sections (one photo/video per screen).
+   ========================================================================== */
+
+:root {
+  --navy-900: #131F2B;
+  --marigold-500: #E8A33D;
+  --white: #FFFFFF;
+
+  --font-head: 'Space Grotesk', 'Noto Sans Gujarati', sans-serif;
+  --font-body: 'Work Sans', 'Noto Sans Gujarati', sans-serif;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--navy-900);
+  font-family: var(--font-body);
+  overscroll-behavior-y: none;
+}
+
+img, video { max-width: 100%; display: block; }
+
+/* ==========================================================================
+   Scroll container — full-screen snap sections, one per "page"
+   ========================================================================== */
+
+.story-scroll {
+  height: 100vh;   /* fallback for older browsers without dvh */
+  height: 100dvh;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.loading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white);
+  font-family: var(--font-head);
+}
+
+.slide {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow: hidden;
+  background: var(--navy-900);
+}
+
+.slide-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slide-overlay {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 24px 56px calc(28px + var(--safe-b)) 20px;
+  background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0) 100%);
+  pointer-events: none; /* caption is decorative — must not block the mute button behind it */
+}
+
+.slide-caption {
+  margin: 0;
+  color: var(--white);
+  font-size: clamp(0.95rem, 4vw, 1.15rem);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.slide-meta-line {
+  margin: 6px 0 0;
+  color: rgba(255,255,255,0.75);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* ---- Video-specific controls ------------------------------------------- */
+
+.mute-toggle {
+  position: absolute;
+  right: 16px;
+  bottom: calc(28px + var(--safe-b));
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.45);
+  color: var(--white);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ---- Contact / icons slide ---------------------------------------------- */
+
+.contact-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 32px 20px calc(32px + var(--safe-b));
+  background: linear-gradient(160deg, #1B2A3A 0%, var(--navy-900) 100%);
+  height: 100%;
+}
+
+.contact-slide h2 {
+  font-family: var(--font-head);
+  color: var(--white);
+  font-size: clamp(1.2rem, 5vw, 1.6rem);
+  margin: 0;
+  text-align: center;
+}
+
+.contact-icons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.contact-icon-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 14px 6px;
+  text-decoration: none;
+}
+
+.contact-icon-link svg {
+  width: 28px;
+  height: 28px;
+  fill: var(--marigold-500);
+}
+
+.contact-icon-link span {
+  font-size: 0.72rem;
+  color: var(--white);
+  font-weight: 500;
+}
+
+/* ---- Testimonial slide --------------------------------------------------- */
+
+.testimonial-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 28px calc(40px + var(--safe-b));
+  height: 100%;
+  background: linear-gradient(160deg, #1B2A3A 0%, var(--navy-900) 100%);
+  text-align: center;
+}
+
+.testimonial-photo {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--marigold-500);
+}
+
+.testimonial-text {
+  font-family: var(--font-head);
+  color: var(--white);
+  font-size: clamp(1.05rem, 4.5vw, 1.35rem);
+  line-height: 1.6;
+  max-width: 440px;
+  margin: 0;
+}
+
+.testimonial-name {
+  color: var(--marigold-500);
+  font-weight: 600;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* ==========================================================================
+   Brand bar (fixed, stays on top while scrolling)
+   ========================================================================== */
+
+.brand-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 20;
+  padding: calc(14px + var(--safe-t)) 56px 14px 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0));
+  pointer-events: none;
+}
+
+.brand-name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: var(--white);
+  font-size: clamp(0.95rem, 4vw, 1.2rem);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+/* ==========================================================================
+   Side progress dots
+   ========================================================================== */
+
+.dots {
+  position: fixed;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  transition: background 0.2s ease, height 0.2s ease;
+}
+
+.dot.is-active {
+  background: var(--marigold-500);
+  height: 18px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-scroll { scroll-behavior: auto; }
+}
