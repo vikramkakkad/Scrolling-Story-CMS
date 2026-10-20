@@ -42,6 +42,111 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+/* ==========================================================================
+   Photo "look" — display mode, scale, positions, smart caption.
+   ⚠ This block is IDENTICAL in script.js (public site) and story-builder.html
+   (live preview). If you change one, change the other.
+   Everything is stored as percentages / directions (never pixels), so it fits
+   any phone shape. "Is the caption outside the photo?" is MEASURED on the real
+   screen, not assumed from a fixed canvas size.
+   ========================================================================== */
+const LOOK_DEFAULT = { mode: "cover", scale: 100, imgPos: "center", capPos: "bottom", shadow: 4, textColor: "white", shadowColor: "black" };
+
+function normalizeLook(raw) {
+  const l = { ...LOOK_DEFAULT, ...(raw || {}) };
+  if (!["cover", "blur", "solid"].includes(l.mode)) l.mode = "cover";
+  const sc = Number(l.scale);
+  l.scale = Math.min(100, Math.max(60, Number.isFinite(sc) ? sc : 100));
+  if (!["top", "center", "bottom"].includes(l.imgPos)) l.imgPos = "center";
+  if (!["top", "center", "bottom"].includes(l.capPos)) l.capPos = "bottom";
+  const sh = Number(l.shadow);
+  l.shadow = Math.min(10, Math.max(0, Number.isFinite(sh) ? sh : 4));
+  l.textColor = l.textColor === "black" ? "black" : "white";
+  l.shadowColor = l.shadowColor === "white" ? "white" : "black";
+  return l;
+}
+
+/* Where the photo is actually drawn inside a frame of W×H (px), for a photo of
+   natural size nw×nh. Cover = whole frame. Blur/Solid = "contain" inside a box
+   that is scale% of the frame, anchored top / center / bottom. */
+function computeImageRect(W, H, nw, nh, look) {
+  if (look.mode === "cover" || !nw || !nh) return { x: 0, y: 0, w: W, h: H };
+  const s = look.scale / 100;
+  const bw = W * s, bh = H * s;
+  const r = nw / nh;
+  let w, h;
+  if (bw / bh > r) { h = bh; w = h * r; } else { w = bw; h = w / r; }
+  const x = (W - w) / 2;
+  const y = look.imgPos === "top" ? 0 : look.imgPos === "bottom" ? H - h : (H - h) / 2;
+  return { x, y, w, h };
+}
+
+/* Share (0..1) of rectangle a that lies inside rectangle b. */
+function overlapFraction(a, b) {
+  const ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+  const iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  return a.w * a.h ? (ix * iy) / (a.w * a.h) : 1;
+}
+
+function lookTextShadow(look) {
+  const b = look.shadow;
+  if (!b) return "none";
+  const c = look.shadowColor === "white" ? "#fff" : "#000";
+  return `0 0 ${b}px ${c}, 0 0 ${b * 2}px ${c}, 0 1px ${Math.max(1, b / 2)}px ${c}`;
+}
+
+/* Smart caption: measure the real caption box against the real photo rectangle.
+   If the caption sits (mostly) outside the photo, add .cap-outside — CSS then
+   forces white text + black shadow (Solution A) and a semi-transparent pill
+   (Solution B). Returns true when the caption is outside. */
+function layoutLookSlide(el, look) {
+  const img = el.querySelector(".look-img");
+  const cap = el.querySelector(".look-caption");
+  const fr = el.getBoundingClientRect();
+  if (!img || !cap || !fr.width || !fr.height) return false;
+  const imgRect = computeImageRect(fr.width, fr.height, img.naturalWidth, img.naturalHeight, look);
+  cap.classList.remove("cap-outside");               // measure WITHOUT the pill
+  const cr = cap.getBoundingClientRect();
+  const capRect = { x: cr.left - fr.left, y: cr.top - fr.top, w: cr.width, h: cr.height };
+  const outside = look.mode !== "cover" && overlapFraction(capRect, imgRect) < 0.5;
+  cap.classList.toggle("cap-outside", outside);
+  return outside;
+}
+
+function renderLookSlide(el, slide, onLayout) {
+  const look = normalizeLook(slide.look);
+  const src = slide.media_url;
+  const alt = escapeHTML(slide.alt_text || slide.caption || "");
+  const metaBits = [];
+  if (slide.actor_name) metaBits.push(`👤 ${escapeHTML(slide.actor_name)}`);
+  if (slide.image_source) metaBits.push(`📷 ${escapeHTML(slide.image_source)}`);
+
+  el.classList.add("look-slide");
+  el.dataset.lookmode = look.mode;
+  el.innerHTML = `
+    <div class="look-bg">${look.mode === "blur" ? `<img src="${src}" alt="" loading="lazy">` : ""}</div>
+    <div class="look-fg ip-${look.imgPos}" style="--s:${look.scale / 100}">
+      <img class="look-img" src="${src}" alt="${alt}" loading="lazy">
+    </div>
+    ${(slide.caption || metaBits.length) ? `<div class="look-caption cp-${look.capPos}">
+      ${slide.caption ? `<span class="cap-text">${escapeHTML(slide.caption)}</span>` : ""}
+      ${metaBits.length ? `<span class="cap-meta">${metaBits.join(" &nbsp;·&nbsp; ")}</span>` : ""}
+    </div>` : ""}`;
+
+  const cap = el.querySelector(".look-caption");
+  if (cap) {
+    cap.style.color = look.textColor === "black" ? "#000" : "#fff";
+    cap.style.textShadow = lookTextShadow(look);
+  }
+
+  const run = () => { const out = layoutLookSlide(el, look); if (onLayout) onLayout(out); };
+  el.querySelector(".look-img").addEventListener("load", run);
+  if (el._lookRO) el._lookRO.disconnect();
+  if (typeof ResizeObserver !== "undefined") { el._lookRO = new ResizeObserver(run); el._lookRO.observe(el); }
+  else window.addEventListener("resize", run);
+  run();
+}
+
 /* --------------------------------------------------------------------------
    Supabase REST helper — plain fetch, no SDK needed for simple reads.
    -------------------------------------------------------------------------- */
@@ -106,6 +211,9 @@ function buildSlideEl(slide, config) {
         <p class="testimonial-name">— ${escapeHTML(slide.customer_name || "ગ્રાહક")}</p>
       </div>
     `;
+  } else if (slide.look) {
+    // photo with a saved "look" (display mode / scale / positions / smart caption)
+    renderLookSlide(el, slide);
   } else {
     // default: image
     const metaBits = [];
@@ -243,7 +351,9 @@ async function loadStoryById(storyId) {
       .map(c => {
         const u = byId[c.id];
         if (!u) return null;
-        return c.duration ? { ...u, duration_override: c.duration } : u;
+        const out = c.duration ? { ...u, duration_override: c.duration } : { ...u };
+        if (c.look) out.look = c.look;
+        return out;
       })
       .filter(Boolean);
   }
